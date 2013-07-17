@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?eclipse version="3.4"?>
+<plugin>
+
+   <extension
+         point="org.eclipse.ui.popupMenus">
+      <objectContribution
+            id="plugin.contribution1"
+            nameFilter="messages.properties"
+            objectClass="org.eclipse.core.resources.IFile">
+            <menu
+               label="NSL TOOL"
+               id="plugin.menu1">
+            <separator
+                  name="group1">
+            </separator>
+         </menu>
+         <action
+               label="Create NLS Class"
+               class="plugin.popup.actions.NewAction"
+               menubarPath="plugin.menu1/group1"
+               enablesFor="1"
+               id="plugin.newAction">
+         </action>
+         <filter
+               name="projectNature"
+               value="org.eclipse.jdt.core.javanature">
+         </filter>
+      </objectContribution>
+          <objectContribution
+                id="plugin.jaction"
+                nameFilter="*.java"
+                objectClass="org.eclipse.jdt.core.IJavaElement">
+         <action
+               class="plugin.popup.actions.Merge"
+               enablesFor="1"
+               id="plugin.jaction"
+               label="Reflect property"
+               menubarPath="plugin.menu2/group1">
+         </action>
+         <menu
+               id="plugin.menu2"
+               label="NSL TOOL">
+            <separator
+                  name="group1">
+            </separator>
+         </menu>
+      </objectContribution>
+   </extension>
+</plugin>

@@ -47,4 +47,11 @@
          </menu>
       </objectContribution>
    </extension>
+   <extension
+         point="org.eclipse.ui.console.consoleFactories">
+      <consoleFactory
+            class="plugin.console.ConsoleFactory"
+            label="propertie">
+      </consoleFactory>
+   </extension>
 </plugin>

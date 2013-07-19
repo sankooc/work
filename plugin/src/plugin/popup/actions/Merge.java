@@ -37,6 +37,8 @@ import org.eclipse.swt.widgets.Shell;
 import org.eclipse.ui.IObjectActionDelegate;
 import org.eclipse.ui.IWorkbenchPart;
 
+import plugin.console.ConsoleFactory;
+
 public class Merge implements IObjectActionDelegate {
 
 	IMember getSourceContent(IParent root) throws JavaModelException {
@@ -56,34 +58,42 @@ public class Merge implements IObjectActionDelegate {
 			IMember source = getSourceContent(unit);
 			for (IJavaElement ele : source.getChildren()) {
 				if (ele instanceof IField) {
-					if((((IField) ele).getFlags() & Flags.AccPrivate) == 0){
-						list.add(ele.getElementName());	 
+					if ((((IField) ele).getFlags() & Flags.AccPrivate) == 0) {
+						list.add(ele.getElementName());
 					}
 				}
 			}
 			IPath root = file.getParent().getPath();
-			IPath pro = root.append("messages.properties"); 
+			IPath pro = root.append("messages.properties");
 			StringBuilder builder = new StringBuilder();
-			IWorkspace workspace= ResourcesPlugin.getWorkspace();
-			IFile fp =workspace.getRoot().getFile(pro);
-			BufferedReader reader = new BufferedReader(new InputStreamReader(fp.getContents()));
-			while(true){
+			IWorkspace workspace = ResourcesPlugin.getWorkspace();
+			IFile fp = workspace.getRoot().getFile(pro);
+			BufferedReader reader = new BufferedReader(new InputStreamReader(
+					fp.getContents()));
+			while (true) {
 				String cont = reader.readLine();
-				if(null == cont){
+				if (null == cont) {
 					break;
 				}
-				if(cont.startsWith("#")){
+				if (cont.trim().isEmpty()) {
+					continue;
+				}
+				if (cont.startsWith("#")) {
 					continue;
 				}
 				String key = cont.split("=")[0].trim();
-				if(list.contains(key)){
-					
-				}else{
-					System.out.println("no this field:"+key);
+				if (list.remove(key)) {
+				} else {
+					ConsoleFactory.appand("no this field:[" + key + "]");
 				}
-				
 			}
-			
+			if (list.isEmpty()) {
+
+			} else {
+				for (String javaKey : list) {
+					ConsoleFactory.appand("no this properties:[" + javaKey + "]");
+				}
+			}
 		} catch (Exception e) {
 			e.printStackTrace();
 		}

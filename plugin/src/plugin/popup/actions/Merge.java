@@ -65,7 +65,6 @@ public class Merge implements IObjectActionDelegate {
 			}
 			IPath root = file.getParent().getPath();
 			IPath pro = root.append("messages.properties");
-			StringBuilder builder = new StringBuilder();
 			IWorkspace workspace = ResourcesPlugin.getWorkspace();
 			IFile fp = workspace.getRoot().getFile(pro);
 			BufferedReader reader = new BufferedReader(new InputStreamReader(

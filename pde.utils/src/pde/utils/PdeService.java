@@ -1,8 +1,11 @@
 package pde.utils;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.PrintStream;
+import java.io.UnsupportedEncodingException;
 import java.lang.reflect.InvocationTargetException;
 import java.net.MalformedURLException;
 import java.net.URI;
@@ -47,6 +50,13 @@ import org.xml.sax.InputSource;
 
 public class PdeService implements CommandProvider {
 
+	EclipseProjectService service;
+
+	public PdeService() {
+		service = new EclipseProjectService();
+	}
+
+	// TODO
 	public void _createlc(CommandInterpreter intp) {
 		ILaunchManager manager = DebugPlugin.getDefault().getLaunchManager();
 		String ur = intp.nextArgument();
@@ -66,14 +76,10 @@ public class PdeService implements CommandProvider {
 	public void _creatws(CommandInterpreter intp) {
 		String arg = intp.nextArgument();
 		if (null == arg || arg.isEmpty()) {
+			intp.println("set name is empty");
 			return;
 		}
-		IWorkbench workbanch = PlatformUI.getWorkbench();
-		IWorkingSetManager workingManager = workbanch.getWorkingSetManager();
-		IWorkingSet set = workingManager.createWorkingSet(arg,
-				new IAdaptable[] {});
-		set.setId("org.eclipse.jdt.ui.JavaWorkingSetPage");
-		workingManager.addWorkingSet(set);
+		service.createWorkSet(arg);
 	}
 
 	Collection<String> ala(CommandInterpreter intp, String content) {
@@ -97,62 +103,36 @@ public class PdeService implements CommandProvider {
 			return;
 		}
 		try {
-			merge(intp, next);
+			service.merge(next);
 		} catch (CoreException e) {
 			intp.printStackTrace(e);
 		}
 
 	}
 
-	void merge(CommandInterpreter intp, String launchName) throws CoreException {
-		ILaunchManager manager = DebugPlugin.getDefault().getLaunchManager();
-		intp.println(launchName);
-		ILaunchConfiguration[] luans = manager.getLaunchConfigurations();
-		for (ILaunchConfiguration launch : luans) {
-			if (launch.getName().equals(launchName)) {
-				String content = launch.getAttribute("selected_target_plugins",
-						"");
-				Collection<String> syms = ala(intp, content);
-				for (String sym : syms) {
-					IPluginModelBase[] ret = PluginRegistry.findModels(sym,
-							VersionRange.emptyRange, new PluginFilter());
-					if (null != ret && ret.length > 1) {
-						for (IPluginModelBase dm : ret) {
-							intp.println("deplicated:"
-									+ dm.getBundleDescription()
-											.getSymbolicName()
-									+ dm.getBundleDescription().getVersion()
-											.toString());
-						}
-					}
-				}
-				return;
-			}
-		}
-	}
-
-	void create(CommandInterpreter intp, String typeName, String defaultName) {
-		ILaunchManager manager = DebugPlugin.getDefault().getLaunchManager();
-		ILaunchConfigurationType[] types = manager
-				.getLaunchConfigurationTypes();
-		for (ILaunchConfigurationType type : types) {
-			if (typeName.equals(type.getName())) {
-				try {
-					ILaunchConfigurationWorkingCopy wc = type.newInstance(null,
-							defaultName);
-					wc.doSave();
-				} catch (CoreException e) {
-					intp.printStackTrace(e);
-				}
-			}
-		}
-	}
+	// void create(CommandInterpreter intp, String typeName, String defaultName)
+	// {
+	// ILaunchManager manager = DebugPlugin.getDefault().getLaunchManager();
+	// ILaunchConfigurationType[] types = manager
+	// .getLaunchConfigurationTypes();
+	// for (ILaunchConfigurationType type : types) {
+	// if (typeName.equals(type.getName())) {
+	// try {
+	// ILaunchConfigurationWorkingCopy wc = type.newInstance(null,
+	// defaultName);
+	// wc.doSave();
+	// } catch (CoreException e) {
+	// intp.printStackTrace(e);
+	// }
+	// }
+	// }
+	// }
 
 	public void _createOsgi(final CommandInterpreter intp) {
 		Display.getDefault().syncExec(new Runnable() {
 			@Override
 			public void run() {
-				create(intp, "OSGi Framework", "new osgi");
+				service.create("OSGi Framework", "new osgi");
 			}
 		});
 
@@ -383,4 +363,5 @@ public class PdeService implements CommandProvider {
 	public String getHelp() {
 		return null;
 	}
+
 }

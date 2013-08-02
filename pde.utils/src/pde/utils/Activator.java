@@ -11,6 +11,8 @@ import org.osgi.framework.BundleContext;
  */
 public class Activator implements BundleActivator {
 
+	public final static String plugin="pde.utils";
+	
 	/**
 	 * The constructor
 	 */

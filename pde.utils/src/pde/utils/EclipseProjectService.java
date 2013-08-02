@@ -1,8 +1,12 @@
 package pde.utils;
 
 import java.io.File;
+import java.io.InputStream;
 import java.io.PrintStream;
+import java.io.StringWriter;
 import java.lang.reflect.InvocationTargetException;
+import java.net.URI;
+import java.net.URLConnection;
 import java.util.ArrayList;
 import java.util.Collection;
 
@@ -29,12 +33,15 @@ import org.eclipse.osgi.service.resolver.VersionRange;
 import org.eclipse.pde.core.plugin.IPluginModelBase;
 import org.eclipse.pde.core.plugin.PluginRegistry;
 import org.eclipse.pde.core.plugin.PluginRegistry.PluginFilter;
+import org.eclipse.swt.widgets.Display;
 import org.eclipse.ui.IWorkbench;
 import org.eclipse.ui.IWorkingSet;
 import org.eclipse.ui.IWorkingSetManager;
 import org.eclipse.ui.PlatformUI;
 import org.eclipse.ui.progress.IProgressService;
+import org.eclipse.ui.statushandlers.StatusManager;
 import org.osgi.framework.Version;
+import org.xml.sax.InputSource;
 import org.eclipse.pde.launching.IPDELauncherConstants;
 
 public class EclipseProjectService {
@@ -62,6 +69,11 @@ public class EclipseProjectService {
 			return version;
 		}
 
+		@Override
+		public String toString() {
+			return "symbolicName:" + symbolicName + " version:" + version;
+		}
+
 	}
 
 	protected Collection<PDEModel> parsePdeModels(String content) {
@@ -82,9 +94,10 @@ public class EclipseProjectService {
 		return models;
 	}
 
-	void merge(PrintStream intp, String launchName) throws CoreException {
+	public void merge(String launchName) throws CoreException {
 		ILaunchManager manager = DebugPlugin.getDefault().getLaunchManager();
-		intp.println(launchName);
+		StringWriter writer = new StringWriter();
+		writer.write(launchName);
 		ILaunchConfiguration[] luans = manager.getLaunchConfigurations();
 		for (ILaunchConfiguration launch : luans) {
 			if (launch.getName().equals(launchName)) {
@@ -95,9 +108,12 @@ public class EclipseProjectService {
 					String sym = model.getSymbolicName();
 					IPluginModelBase[] ret = PluginRegistry.findModels(sym,
 							VersionRange.emptyRange, new PluginFilter());
-					if (null != ret && ret.length > 1) {
+					if (null != ret && ret.length == 0) {
+						writer.write("cannot find pde model : "
+								+ model.toString());
+					} else if (ret.length > 1) {
 						for (IPluginModelBase dm : ret) {
-							intp.println("deplicated:"
+							writer.write("deplicated:"
 									+ dm.getBundleDescription()
 											.getSymbolicName()
 									+ dm.getBundleDescription().getVersion()
@@ -110,7 +126,17 @@ public class EclipseProjectService {
 		}
 	}
 
-	void create(CommandInterpreter intp, String typeName, String defaultName) {
+	public IWorkingSet createWorkSet(String workset) {
+		IWorkbench workbanch = PlatformUI.getWorkbench();
+		IWorkingSetManager workingManager = workbanch.getWorkingSetManager();
+		IWorkingSet set = workingManager.createWorkingSet(workset,
+				new IAdaptable[] {});
+		set.setId("org.eclipse.jdt.ui.JavaWorkingSetPage");
+		workingManager.addWorkingSet(set);
+		return set;
+	}
+
+	public void create(String typeName, String defaultName) {
 		ILaunchManager manager = DebugPlugin.getDefault().getLaunchManager();
 		ILaunchConfigurationType[] types = manager
 				.getLaunchConfigurationTypes();
@@ -121,28 +147,13 @@ public class EclipseProjectService {
 							defaultName);
 					wc.doSave();
 				} catch (CoreException e) {
-					intp.printStackTrace(e);
+					StatusManager.getManager().handle(e, Activator.plugin);
 				}
 			}
 		}
 	}
 
-	void getWorkspaceProjects(CommandInterpreter intp) {
-
-		IPluginModelBase[] models = PluginRegistry.getWorkspaceModels();
-		if (null == models || models.length == 0) {
-			intp.println("no workspace model");
-			return;
-		}
-		for (IPluginModelBase modelBase : models) {
-			intp.println(modelBase.getBundleDescription().getSymbolicName()
-					+ modelBase.getBundleDescription().getVersion().toString());
-		}
-	}
-
-	void updateProject(final IProject project, IProgressService pservice,
-			CommandInterpreter intp) {
-		intp.println("start to run " + project.getName());
+	public void updateProject(final IProject project, IProgressService pservice) {
 		try {
 			pservice.run(true, true, new IRunnableWithProgress() {
 				@Override
@@ -151,7 +162,7 @@ public class EclipseProjectService {
 					try {
 						project.refreshLocal(IResource.DEPTH_INFINITE, monitor);
 					} catch (CoreException e) {
-						e.printStackTrace();
+						StatusManager.getManager().handle(e, Activator.plugin);
 					}
 
 				}
@@ -161,19 +172,19 @@ public class EclipseProjectService {
 		}
 	}
 
-	void updateProject(String name, CommandInterpreter intp) {
+	public void updateProject(String name, PrintStream intp) {
 		final IWorkspace workspace = ResourcesPlugin.getWorkspace();
 		IProject[] projects = workspace.getRoot().getProjects();
 		IProgressService pservice = PlatformUI.getWorkbench()
 				.getProgressService();
 		if (null == name || name.trim().isEmpty()) {
 			for (final IProject project : projects) {
-				updateProject(project, pservice, intp);
+				updateProject(project, pservice);
 			}
 		} else {
 			for (IProject project : projects) {
 				if (project.getName().equals(name)) {
-					updateProject(project, pservice, intp);
+					updateProject(project, pservice);
 					return;
 				}
 			}
@@ -188,7 +199,51 @@ public class EclipseProjectService {
 				.equals(Platform.getLocation().toFile());
 	}
 
-	void loadProject(File projectfile, final String ws) throws CoreException {
+	public void createWorkspace(String filepath, String rootPath) {
+		File root = new File(rootPath);
+		try {
+			javax.xml.xpath.XPathFactory xfactory = javax.xml.xpath.XPathFactory
+					.newInstance();
+			javax.xml.xpath.XPath xpath = xfactory.newXPath();
+			final javax.xml.xpath.XPathExpression expression = xpath
+					.compile("/launchConfiguration/stringAttribute[@key='selected_workspace_plugins']/@value");
+			URLConnection connection = URI.create(filepath).toURL()
+					.openConnection();
+			InputStream stream = connection.getInputStream();
+			String ret = expression.evaluate(new InputSource(stream));
+			Collection<PDEModel> list = parsePdeModels(ret);
+			File[] models = root.listFiles();
+			for (File module : models) {
+				if (module.isDirectory()) {
+					final String moduleName = module.getName();
+					File[] prl = module.listFiles();
+					for (final File projectDir : prl) {
+						String pName = projectDir.getName();
+						if (list.remove(pName)) {
+							try {
+								loadProject(projectDir, moduleName);
+							} catch (CoreException e) {
+								StatusManager.getManager().handle(e,
+										Activator.plugin);
+							}
+						}
+					}
+				}
+			}
+//			if (!list.isEmpty()) {
+//				intp.println(" no find projects:");
+//				for (String pn : list) {
+//					intp.println("[" + pn + "]");
+//				}
+//
+//			}
+		} catch (Exception e) {
+//			intp.printStackTrace(e);
+		}
+	}
+
+	public void loadProject(File projectfile, final String ws)
+			throws CoreException {
 		File file = new File(projectfile, ".project");
 		String projectName;
 		final IProjectDescription description;
@@ -205,6 +260,9 @@ public class EclipseProjectService {
 			}
 			final IProject project = ResourcesPlugin.getWorkspace().getRoot()
 					.getProject(projectName);
+			if (project.exists()) {
+				return;
+			}
 			description.setName(projectName);
 			IProgressService pservice = PlatformUI.getWorkbench()
 					.getProgressService();
@@ -237,15 +295,14 @@ public class EclipseProjectService {
 										new IWorkingSet[] { set });
 							}
 						} catch (CoreException e) {
-							throw new InvocationTargetException(e);
+							StatusManager.getManager().handle(e,
+									Activator.plugin);
 						} finally {
 							monitor.done();
 						}
-
 					}
 				});
 			} catch (Exception e) {
-				e.printStackTrace();
 			}
 
 		} else {
